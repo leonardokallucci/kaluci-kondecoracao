@@ -1,2 +1,1 @@
-import AprovacoesAdmin from '@/components/AprovacoesAdmin'
-export default function Page(){ return <AprovacoesAdmin/> }
+export default function Page(){ return (<div className='card'><div className='section-title'>Aprovações</div><p className='text-sm muted'>Tela estética pronta. Integração de dados será conectada depois.</p></div>) }

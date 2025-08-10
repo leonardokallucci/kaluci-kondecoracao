@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import '@/styles/globals.css'
+import Nav from '@/components/Nav'
 
 export const metadata: Metadata = {
   title: 'Kaluci — Kondecoração',
@@ -10,22 +11,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }){
   return (
     <html lang="pt-br">
       <body>
-        <header className="border-b">
-          <div className="container py-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-black text-white grid place-items-center font-bold">K</div>
+        <header className="header">
+          <div className="container header-inner">
+            <div className="brand">
+              <img src="/logo.png" className="brand-logo" alt="Kaluci" />
               <div>
-                <div className="text-sm font-semibold">Kondecoração — Escudo Kaluci</div>
-                <div className="text-xs text-neutral-500">1 ponto = 5 Koins • 1 Koin = R$1 (Pix)</div>
+                <div className="brand-title">Kondecoração — Escudo Kaluci</div>
+                <div className="brand-sub">1 ponto = 5 Koins • 1 Koin = R$1 (Pix)</div>
               </div>
             </div>
-            <nav className="flex items-center gap-2 text-sm">
-              <a className="btn" href="/login">Entrar</a>
-              <a className="btn" href="/dashboard">Dashboard</a>
-            </nav>
+            <Nav />
           </div>
         </header>
-        <main className="container py-6">{children}</main>
+        <main>
+          <div className="container">{children}</div>
+        </main>
       </body>
     </html>
   )

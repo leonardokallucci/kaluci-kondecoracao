@@ -10,24 +10,28 @@ export default function LoginPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setMsg(null)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) setMsg(error.message)
-    else window.location.href = '/dashboard'
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+      window.location.href = '/dashboard'
+    } catch (e:any) {
+      setMsg(e.message)
+    }
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4 max-w-md">
-      <div className="text-lg font-semibold">Entrar</div>
-      <div>
-        <label className="text-sm">E-mail</label>
-        <input className="input mt-1" value={email} onChange={e => setEmail(e.target.value)} />
+    <form onSubmit={onSubmit} className="card" style={{maxWidth:480, margin:'0 auto'}}>
+      <div className="section-title">Entrar</div>
+      <div style={{marginBottom:12}}>
+        <label className="text-xs">E-mail</label>
+        <input className="input" value={email} onChange={e => setEmail(e.target.value)} />
       </div>
-      <div>
-        <label className="text-sm">Senha</label>
-        <input type="password" className="input mt-1" value={password} onChange={e => setPassword(e.target.value)} />
+      <div style={{marginBottom:12}}>
+        <label className="text-xs">Senha</label>
+        <input type="password" className="input" value={password} onChange={e => setPassword(e.target.value)} />
       </div>
       <button className="btn">Entrar</button>
-      {msg && <div className="text-sm">{msg}</div>}
+      {msg && <div className="text-sm" style={{marginTop:12}}>{msg}</div>}
     </form>
   )
 }

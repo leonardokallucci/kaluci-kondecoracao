@@ -1,2 +1,1 @@
-import ColaboradoresAdmin from '@/components/ColaboradoresAdmin'
-export default function Page(){ return <ColaboradoresAdmin/> }
+export default function Page(){ return (<div className='card'><div className='section-title'>Colaboradores</div><p className='text-sm muted'>Tela estética pronta. Integração de dados será conectada depois.</p></div>) }

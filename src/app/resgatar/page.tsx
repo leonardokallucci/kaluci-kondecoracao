@@ -1,2 +1,1 @@
-import Resgatar from '@/components/Resgatar'
-export default function Page(){ return <Resgatar/> }
+export default function Page(){ return (<div className='card'><div className='section-title'>Resgatar</div><p className='text-sm muted'>Tela estética pronta. Integração de dados será conectada depois.</p></div>) }

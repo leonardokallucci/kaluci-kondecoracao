@@ -1,2 +1,1 @@
-import Pontuar from '@/components/Pontuar'
-export default function Page(){ return <Pontuar/> }
+export default function Page(){ return (<div className='card'><div className='section-title'>Pontuar</div><p className='text-sm muted'>Tela estética pronta. Integração de dados será conectada depois.</p></div>) }
