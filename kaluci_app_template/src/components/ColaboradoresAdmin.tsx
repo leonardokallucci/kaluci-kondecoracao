@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState } from 'react'
-import { supabase } from '@/src/lib/supabaseClient'
+import { supabase } from '@/lib/supabaseClient'
 
 export default function ColaboradoresAdmin() {
   const [list, setList] = useState<any[]>([])
@@ -21,7 +21,7 @@ export default function ColaboradoresAdmin() {
     e.preventDefault()
     setMsg(null)
     try {
-      const { data, error } = await supabase.rpc('upsert_profile', {
+      const { error } = await supabase.rpc('upsert_profile', {
         p_user_id: userId,
         p_first_name: firstName,
         p_setor: setor,
