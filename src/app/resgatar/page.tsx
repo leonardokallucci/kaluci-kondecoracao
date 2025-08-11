@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import * as SupabaseModule from '@/lib/supabaseClient'; // qualquer tipo de export
+import * as SupabaseModule from '@/lib/supabaseClient';
 
 type WithdrawalStatus = 'pending' | 'approved' | 'denied';
 type Withdrawal = {
@@ -23,28 +23,17 @@ const statusChip: Record<WithdrawalStatus, string> = {
 function resolveSupabaseClient(): any {
   const m: any = SupabaseModule as any;
 
-  // 1) export const supabase = createClient(...)
   if (m.supabase?.auth) return m.supabase;
-
-  // 2) export default {supabase}
   if (m.default?.supabase?.auth) return m.default.supabase;
-
-  // 3) export function createClient() { return createClient(...) }
   if (typeof m.createClient === 'function') {
     const c = m.createClient();
     if (c?.auth) return c;
   }
-
-  // 4) export default function createClient() { ... }
   if (typeof m.default === 'function') {
     const c = m.default();
     if (c?.auth) return c;
   }
-
-  // 5) export default supabase (instância)
   if (m.default?.auth) return m.default;
-
-  // 6) último recurso: o próprio módulo pode ser a instância
   if (m?.auth) return m;
 
   throw new Error('Não foi possível resolver o cliente Supabase. Verifique src/lib/supabaseClient.ts');
@@ -68,7 +57,6 @@ export default function ResgatarPage() {
     setLoading(true);
     setError(null);
     try {
-      // se o client estivesse indefinido, o adapter já teria lançado erro
       const { data, error: sErr } = await supabase.auth.getSession();
       if (sErr) throw sErr;
 
@@ -97,7 +85,7 @@ export default function ResgatarPage() {
       .from('v_user_balance')
       .select('koins_balance')
       .eq('user_id', uid)
-      .maybeSingle(); // evita “JSON object requested…”
+      .maybeSingle(); // evita “JSON object requested…” quando 0 ou >1
 
     if (error) {
       setBalance(0);
@@ -114,6 +102,20 @@ export default function ResgatarPage() {
       .order('created_at', { ascending: false });
 
     setHistory(error ? [] : (data ?? []));
+  }
+
+  function useMax() {
+    setAmount(String(balance || ''));
+  }
+
+  async function copyCoupon(c: string) {
+    try {
+      await navigator.clipboard.writeText(c);
+      setOkMsg('Cupom copiado!');
+      setTimeout(() => setOkMsg(null), 1500);
+    } catch {
+      // ignora
+    }
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -149,26 +151,37 @@ export default function ResgatarPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const disabledSubmit = loading || submitting;
+
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
-      <div className="mb-6">
+      {/* Título */}
+      <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Resgatar Koins</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Converta seus Koins em cupom. O pedido vai para aprovação.
         </p>
-      </div>
+      </header>
 
+      {/* Alertas */}
       {error && (
-        <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+        >
           {error}
         </div>
       )}
       {okMsg && (
-        <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
+        <div
+          role="status"
+          className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+        >
           {okMsg}
         </div>
       )}
 
+      {/* Não logado */}
       {!loading && !userId && (
         <div className="rounded-xl border border-zinc-200 bg-white p-6 text-zinc-700 shadow-sm">
           Você não está logado. Acesse{' '}
@@ -179,19 +192,27 @@ export default function ResgatarPage() {
         </div>
       )}
 
+      {/* Conteúdo */}
       {userId && (
         <div className="grid gap-6 md:grid-cols-2">
-          {/* Formulário */}
-          <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          {/* Card: Formulário */}
+          <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+            {/* Header do card */}
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <div className="text-xs uppercase tracking-wide text-zinc-500">Usuário</div>
+                <div className="text-[11px] uppercase tracking-wide text-zinc-500">Usuário</div>
                 <div className="mt-1 font-medium text-zinc-900">
-                  {loading ? <span className="inline-block h-4 w-40 animate-pulse rounded bg-zinc-200" /> : (email || '—')}
+                  {loading ? (
+                    <span className="inline-block h-4 w-40 animate-pulse rounded bg-zinc-200" />
+                  ) : (
+                    email || '—'
+                  )}
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xs uppercase tracking-wide text-zinc-500">Saldo disponível</div>
+                <div className="text-[11px] uppercase tracking-wide text-zinc-500">
+                  Saldo disponível
+                </div>
                 <div className="mt-1">
                   <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-sm font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-200">
                     {loading ? '—' : `${balance} Koins`}
@@ -200,19 +221,30 @@ export default function ResgatarPage() {
               </div>
             </div>
 
+            {/* Form */}
             <form onSubmit={onSubmit} className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-zinc-700">
                   Quantidade a resgatar (Koins)
                 </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="Ex.: 150"
-                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none transition focus:border-indigo-400"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={1}
+                    max={balance || undefined}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="Ex.: 150"
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-zinc-900 outline-none transition focus:border-indigo-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={useMax}
+                    className="absolute inset-y-0 right-1 my-1 rounded-md px-2 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                  >
+                    Usar máx.
+                  </button>
+                </div>
                 <p className="mt-1 text-xs text-zinc-500">Máx.: {balance} Koins</p>
               </div>
 
@@ -225,22 +257,22 @@ export default function ResgatarPage() {
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="Ex.: Preciso do cupom hoje"
-                  className="w-full resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none transition focus:border-indigo-400"
+                  className="w-full resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-zinc-900 outline-none transition focus:border-indigo-400"
                 />
               </div>
 
               <button
                 type="submit"
-                disabled={loading || submitting}
+                disabled={disabledSubmit}
                 className="inline-flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? 'Enviando…' : 'Solicitar Resgate'}
               </button>
             </form>
-          </div>
+          </section>
 
-          {/* Histórico */}
-          <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          {/* Card: Histórico */}
+          <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-zinc-900">Histórico</h2>
             </div>
@@ -258,27 +290,41 @@ export default function ResgatarPage() {
               <p className="text-sm text-zinc-500">
                 Nenhuma solicitação ainda.
                 <br />
-                Pedidos aprovados exibem o <span className="font-medium">cupom</span>. Use-o no site conforme combinado.
+                Pedidos aprovados exibem o <span className="font-medium">cupom</span>. Use-o no site
+                conforme combinado.
               </p>
             ) : (
               <ul className="divide-y divide-zinc-200">
                 {history.map((w) => (
                   <li key={w.id} className="flex items-start justify-between py-3">
                     <div>
-                      <div className="text-sm font-medium text-zinc-900">{w.amount_koins} Koins</div>
+                      <div className="text-sm font-medium text-zinc-900">
+                        {w.amount_koins} Koins
+                      </div>
                       <div className="text-xs text-zinc-500">
                         {new Date(w.created_at).toLocaleString('pt-BR')}
                         {w.note ? ` • ${w.note}` : ''}
                       </div>
+
                       {w.coupon && w.status === 'approved' && (
-                        <div className="mt-1">
+                        <div className="mt-1 inline-flex items-center gap-2">
                           <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 font-mono text-xs text-zinc-800 ring-1 ring-inset ring-zinc-200">
                             {w.coupon}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => copyCoupon(w.coupon!)}
+                            className="text-xs font-medium text-indigo-700 hover:underline"
+                          >
+                            copiar
+                          </button>
                         </div>
                       )}
                     </div>
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusChip[w.status]}`}>
+
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusChip[w.status]}`}
+                    >
                       {w.status === 'pending' && 'Pendente'}
                       {w.status === 'approved' && 'Aprovado'}
                       {w.status === 'denied' && 'Negado'}
@@ -287,7 +333,7 @@ export default function ResgatarPage() {
                 ))}
               </ul>
             )}
-          </div>
+          </section>
         </div>
       )}
     </div>
