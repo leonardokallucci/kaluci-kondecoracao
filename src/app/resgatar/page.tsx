@@ -117,7 +117,7 @@ export default function ResgatarPage() {
           <div className="text-sm text-neutral-500">Usuário</div>
           <div className="mb-4 font-medium">{email ?? '—'}</div>
 
-          <div className="text-sm text-neutral-500">Saldo disponível</div>
+          <div className="text-sm text-neutral-500">Saldo disponível teste</div>
           <div className="mb-6 text-lg font-semibold">{balance} Koins</div>
 
           <label className="block text-sm font-medium mb-1">Quantidade a resgatar (Koins)</label>
