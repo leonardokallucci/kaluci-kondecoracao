@@ -34,38 +34,45 @@ export default function ResgatarPage() {
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        setErr(null);
+  const load = async () => {
+    try {
+      setLoading(true);
+      setErr(null);
 
-        // sessão
-        const { data: { session } } = await supabase.auth.getSession();
-        setLoggedEmail(session?.user?.email ?? null);
+      // sessão
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id || null;
+      setLoggedEmail(session?.user?.email ?? null);
 
-        // saldo (view v_user_balance)
-        const { data: vb, error: ebal } = await supabase
+      // >>> SALDO: filtra pela pessoa logada <<<
+      let vbBalance = 0;
+      if (uid) {
+        const { data: vbRow, error: ebal } = await supabase
           .from('v_user_balance')
           .select('koins_balance')
-          .maybeSingle();
-        if (ebal) throw ebal;
-        setBalance(vb?.koins_balance ?? 0);
+          .eq('user_id', uid)  // <--- filtro necessário
+          .maybeSingle();      // retorna 0 ou 1 linha
 
-        // histórico do próprio usuário
-        const { data: ws, error: ew } = await supabase
-          .from('withdrawals')
-          .select('id,amount_koins,status,coupon,note,created_at')
-          .order('created_at', { ascending: false });
-        if (ew) throw ew;
-        setRows((ws || []) as Withdrawal[]);
-      } catch (e: any) {
-        setErr(e.message ?? String(e));
-      } finally {
-        setLoading(false);
+        if (ebal) throw ebal;
+        vbBalance = vbRow?.koins_balance ?? 0;
       }
-    };
-    load();
-  }, []);
+      setBalance(vbBalance);
+
+      // histórico (RLS já limita ao próprio usuário, mas tudo bem se quiser reforçar com .eq('user_id', uid))
+      const { data: ws, error: ew } = await supabase
+        .from('withdrawals')
+        .select('id,amount_koins,status,coupon,note,created_at')
+        .order('created_at', { ascending: false });
+      if (ew) throw ew;
+      setRows((ws || []) as Withdrawal[]);
+    } catch (e: any) {
+      setErr(e.message ?? String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+  load();
+}, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,11 +92,11 @@ export default function ResgatarPage() {
       setAmount('');
       setNote('');
       // Recarrega rápido saldo + extrato
-      const [{ data: vb }, { data: ws }] = await Promise.all([
-        supabase.from('v_user_balance').select('koins_balance').maybeSingle(),
+      const [{ data: vbRow }, { data: ws }] = await Promise.all([
+        supabase.from('v_user_balance').select('koins_balance').eq('user_id', uid!).maybeSingle(),
         supabase.from('withdrawals').select('id,amount_koins,status,coupon,note,created_at').order('created_at', { ascending: false }),
       ]);
-      setBalance(vb?.koins_balance ?? 0);
+      setBalance(vbRow?.koins_balance ?? 0);F
       setRows((ws || []) as Withdrawal[]);
       alert('Solicitação enviada! Aguarde a aprovação.');
     } catch (e: any) {
