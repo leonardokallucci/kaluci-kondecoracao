@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { createClient } from '@/lib/supabaseClient';
+import createClient from '@/lib/supabaseClient';
 
 // Tipos do histórico de saque
 type WithdrawalStatus = 'pending' | 'approved' | 'denied';
