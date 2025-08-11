@@ -36,16 +36,17 @@ export default function ResgatarPage() {
         setUid(u?.id ?? null);
 
         // ----- SALDO -----
+
         let bal = 0;
         if (u?.id) {
           const { data: vb, error: ebal } = await supabase
             .from('v_user_balance')
             .select('koins_balance')
             .eq('user_id', u.id)   // FILTRA PELO USUÁRIO
-            .limit(1);             // retorna no máx. 1 linha
+            .maybeSingle();          
 
           if (ebal) throw ebal;
-          bal = vb && vb.length > 0 ? (vb[0] as any).koins_balance ?? 0 : 0;
+          bal = vb?.koins_balance ?? 0;
         }
         setBalance(bal);
 
