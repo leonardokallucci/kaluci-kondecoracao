@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { useEffect, useMemo, useState } from 'react';
+import { createClient } from '@/lib/supabaseClient';
 
-type WithdrawalRow = {
+type W = {
   id: string;
   amount_koins: number;
   status: 'pending' | 'approved' | 'denied';
@@ -13,292 +13,277 @@ type WithdrawalRow = {
 };
 
 export default function ResgatarPage() {
-  const [loading, setLoading] = useState(false);
-
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string>('');
-
+  const supabase = useMemo(() => createClient(), []);
+  const [email, setEmail] = useState<string>('');
+  const [userId, setUserId] = useState<string>('');
   const [balance, setBalance] = useState<number>(0);
-  const [rows, setRows] = useState<WithdrawalRow[]>([]);
-
+  const [history, setHistory] = useState<W[]>([]);
   const [amount, setAmount] = useState<string>('');
   const [note, setNote] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
 
-  const [errorMsg, setErrorMsg] = useState<string>('');
-  const [okMsg, setOkMsg] = useState<string>('');
+  // cores de status
+  const statusClasses: Record<W['status'], string> = {
+    pending: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+    approved: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+    denied: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
+  };
 
-  async function loadData() {
-    setErrorMsg('');
-    setOkMsg('');
-
-    const { data: sess } = await supabase.auth.getUser();
-    const u = sess?.user ?? null;
-
-    if (!u) {
-      setUserId(null);
-      setUserEmail('');
-      setBalance(0);
-      setRows([]);
-      return;
-    }
-
-    setUserId(u.id);
-    setUserEmail(u.email ?? '');
-
-    const { data: vb, error: eBal } = await supabase
-      .from('v_user_balance')
-      .select('koins_balance')
-      .eq('user_id', u.id)
-      .maybeSingle();
-
-    if (eBal) setErrorMsg(eBal.message);
-    setBalance(vb?.koins_balance ?? 0);
-
-    const { data: ws, error: eHist } = await supabase
-      .from('withdrawals')
-      .select('id, amount_koins, status, coupon, note, created_at')
-      .eq('user_id', u.id)
-      .order('created_at', { ascending: false });
-
-    if (eHist) {
-      setErrorMsg(eHist.message);
-      setRows([]);
-    } else {
-      setRows((ws ?? []) as WithdrawalRow[]);
+  async function loadSession() {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: sessionRes, error: sErr } = await supabase.auth.getSession();
+      if (sErr) throw sErr;
+      const sess = sessionRes?.session;
+      if (!sess?.user) {
+        setEmail('');
+        setUserId('');
+        setBalance(0);
+        setHistory([]);
+        setLoading(false);
+        return;
+      }
+      setEmail(sess.user.email ?? '');
+      setUserId(sess.user.id);
+      await Promise.all([loadBalance(sess.user.id), loadHistory(sess.user.id)]);
+    } catch (e: any) {
+      setError(e?.message ?? 'Erro inesperado ao carregar sessão.');
+    } finally {
+      setLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // pega saldo (view v_user_balance)
+  async function loadBalance(uid: string) {
+    const { data, error } = await supabase
+      .from('v_user_balance')
+      .select('koins_balance')
+      .eq('user_id', uid)
+      .maybeSingle(); // evita "JSON object requested" quando não há linha
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    if (error) {
+      // se a view ainda não tem linha, considera 0
+      if (error.code) {
+        setBalance(0);
+      } else {
+        setError('Falha ao buscar saldo.');
+      }
+      return;
+    }
+    setBalance(data?.koins_balance ?? 0);
+  }
+
+  // histórico simples
+  async function loadHistory(uid: string) {
+    const { data, error } = await supabase
+      .from('withdrawals')
+      .select('id, amount_koins, status, coupon, note, created_at')
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      setError('Falha ao carregar histórico.');
+      return;
+    }
+    setHistory(data ?? []);
+  }
+
+  // submit para solicitar resgate
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setErrorMsg('');
-    setOkMsg('');
+    setError(null);
+    setOkMsg(null);
 
-    if (!userId) {
-      setErrorMsg('Você precisa estar logado para solicitar resgate.');
+    const a = Number(amount);
+    if (!a || a <= 0) {
+      setError('Informe um valor válido de Koins.');
+      return;
+    }
+    if (a > balance) {
+      setError('Valor solicitado é maior que seu saldo disponível.');
       return;
     }
 
-    const amt = Number(amount);
-    if (!Number.isFinite(amt) || amt <= 0) {
-      setErrorMsg('Informe um valor válido de Koins.');
-      return;
-    }
-    if (amt > balance) {
-      setErrorMsg('Valor maior que o saldo disponível.');
-      return;
-    }
-
-    setLoading(true);
     try {
+      setSubmitting(true);
       const { error } = await supabase.rpc('request_withdrawal', {
-        p_amount: amt,
+        p_amount: a,
         p_note: note || null,
       });
       if (error) throw error;
 
-      setOkMsg('Pedido de resgate enviado com sucesso! Aguarde aprovação do cupom.');
+      setOkMsg('Solicitação enviada com sucesso! Aguarde aprovação do administrador.');
       setAmount('');
       setNote('');
-
-      const [{ data: vb, error: e1 }, { data: ws, error: e2 }] = await Promise.all([
-        supabase
-          .from('v_user_balance')
-          .select('koins_balance')
-          .eq('user_id', userId)
-          .maybeSingle(),
-        supabase
-          .from('withdrawals')
-          .select('id, amount_koins, status, coupon, note, created_at')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false }),
-      ]);
-
-      if (e1) setErrorMsg(e1.message);
-      if (e2) setErrorMsg(e2.message);
-
-      setBalance(vb?.koins_balance ?? 0);
-      setRows((ws ?? []) as WithdrawalRow[]);
-    } catch (err: any) {
-      setErrorMsg(err?.message ?? 'Falha ao solicitar resgate.');
+      await Promise.all([loadBalance(userId), loadHistory(userId)]);
+    } catch (e: any) {
+      setError(e?.message ?? 'Não foi possível enviar a solicitação.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
-  };
+  }
 
-  // helpers de estilo
-  const statusBadge = (s: WithdrawalRow['status']) => {
-    const base =
-      'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium';
-    if (s === 'approved') return `${base} bg-emerald-50 text-emerald-700 border border-emerald-200`;
-    if (s === 'denied') return `${base} bg-rose-50 text-rose-700 border border-rose-200`;
-    return `${base} bg-amber-50 text-amber-700 border border-amber-200`; // pending
-  };
+  useEffect(() => {
+    loadSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6">
-      {/* Header */}
+    <div className="mx-auto max-w-6xl px-4 pb-16">
+      {/* Título */}
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
           Resgatar Koins
         </h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Converta seus Koins em cupom. Pedidos são aprovados pelo administrador.
+        <p className="mt-1 text-sm text-zinc-500">
+          Converta seus Koins em cupom quando precisar. O pedido vai para aprovação.
         </p>
       </div>
 
-      {/* Alerts */}
-      {errorMsg && (
-        <div className="mb-6 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 px-4 py-3">
-          {errorMsg}
+      {/* Alertas */}
+      {error && (
+        <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">
+          {error}
         </div>
       )}
       {okMsg && (
-        <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 px-4 py-3">
+        <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
           {okMsg}
         </div>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Form Card */}
-        <div className="rounded-2xl border border-zinc-200 bg-white/80 backdrop-blur shadow-sm">
-          <div className="p-5 md:p-6">
-            {/* Top user + balance */}
-            <div className="flex items-start justify-between gap-4 mb-6">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-zinc-500">
-                  Usuário
-                </div>
-                <div className="text-sm md:text-base font-medium text-zinc-800">
-                  {userEmail || '—'}
-                </div>
-              </div>
-
-              <div className="text-right">
-                <div className="text-xs uppercase tracking-wide text-zinc-500">
-                  Saldo
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 px-3 py-1 bg-zinc-50">
-                  <span className="text-lg font-semibold">{balance}</span>
-                  <span className="text-xs text-zinc-500">Koins</span>
-                </div>
+      {/* Conteúdo */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Card esquerdo */}
+        <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          {/* Header do card */}
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-zinc-500">Usuário</div>
+              <div className="mt-1 font-medium text-zinc-900">
+                {loading ? (
+                  <span className="inline-block h-4 w-40 animate-pulse rounded bg-zinc-200" />
+                ) : (
+                  email || '—'
+                )}
               </div>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1.5">
-                  Quantidade a resgatar (Koins)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="Ex.: 150"
-                  className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-zinc-800 placeholder:text-zinc-400 outline-none focus:ring-4 focus:ring-black/5 focus:border-zinc-300 transition"
-                />
-                <div className="text-xs text-zinc-500 mt-1.5">
-                  Máx.: <span className="font-medium">{balance}</span> Koins
-                </div>
+            <div className="text-right">
+              <div className="text-xs uppercase tracking-wide text-zinc-500">
+                Saldo disponível
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1.5">
-                  Observação (opcional)
-                </label>
-                <input
-                  type="text"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Ex.: Preciso do cupom ainda hoje"
-                  className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-zinc-800 placeholder:text-zinc-400 outline-none focus:ring-4 focus:ring-black/5 focus:border-zinc-300 transition"
-                />
+              <div className="mt-1">
+                <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-sm font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                  {loading ? '—' : `${balance} Koins`}
+                </span>
               </div>
-
-              <button
-                type="submit"
-                disabled={loading || !userId}
-                className="w-full inline-flex items-center justify-center rounded-xl bg-zinc-900 text-white py-2.75 font-medium shadow-sm hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                {loading ? 'Enviando…' : 'Solicitar Resgate'}
-              </button>
-            </form>
+            </div>
           </div>
+
+          <form onSubmit={onSubmit} className="space-y-4">
+            {/* Quantidade */}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">
+                Quantidade a resgatar (Koins)
+              </label>
+              <input
+                type="number"
+                min={1}
+                inputMode="numeric"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="Ex.: 150"
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none ring-0 transition focus:border-indigo-400"
+              />
+              <p className="mt-1 text-xs text-zinc-500">Máx.: {balance} Koins</p>
+            </div>
+
+            {/* Observação */}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">
+                Observação (opcional)
+              </label>
+              <textarea
+                rows={2}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Ex.: Preciso do cupom hoje"
+                className="w-full resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none ring-0 transition focus:border-indigo-400"
+              />
+            </div>
+
+            {/* Botão */}
+            <button
+              type="submit"
+              disabled={loading || submitting}
+              className="inline-flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting ? 'Enviando…' : 'Solicitar Resgate'}
+            </button>
+          </form>
         </div>
 
-        {/* History Card */}
-        <div className="rounded-2xl border border-zinc-200 bg-white/80 backdrop-blur shadow-sm">
-          <div className="p-5 md:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg md:text-xl font-semibold">Histórico</h2>
-              {rows.length > 0 && (
-                <span className="text-xs text-zinc-500">
-                  {rows.length} pedido{rows.length > 1 ? 's' : ''}
-                </span>
-              )}
+        {/* Card direito – Histórico */}
+        <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-zinc-900">Histórico</h2>
+          </div>
+
+          {/* Lista */}
+          {loading ? (
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex animate-pulse items-center justify-between">
+                  <span className="h-4 w-32 rounded bg-zinc-200" />
+                  <span className="h-4 w-24 rounded bg-zinc-200" />
+                </div>
+              ))}
             </div>
-
-            {rows.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-zinc-200 p-6 text-sm text-zinc-500">
-                Nenhuma solicitação ainda.
-                <br />
-                Pedidos aprovados exibem o <strong>cupom</strong>. Use-o no site conforme
-                combinado.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {rows.map((r) => (
-                  <div
-                    key={r.id}
-                    className="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50/60 transition flex items-start justify-between gap-4"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-zinc-800">
-                          {r.amount_koins} Koins
-                        </span>
-                        <span className={statusBadge(r.status)}>
-                          {r.status === 'approved'
-                            ? 'Aprovado'
-                            : r.status === 'denied'
-                            ? 'Negado'
-                            : 'Pendente'}
-                        </span>
-                      </div>
-
-                      <div className="text-xs text-zinc-500 mt-0.5">
-                        {new Date(r.created_at).toLocaleString()}
-                      </div>
-
-                      {r.note && (
-                        <div className="text-xs text-zinc-600 mt-1 line-clamp-2">
-                          Obs.: {r.note}
-                        </div>
-                      )}
+          ) : history.length === 0 ? (
+            <p className="text-sm text-zinc-500">
+              Nenhuma solicitação ainda.
+              <br />
+              Pedidos aprovados exibem o <span className="font-medium">cupom</span>. Use-o no
+              site conforme combinado.
+            </p>
+          ) : (
+            <ul className="divide-y divide-zinc-200">
+              {history.map((w) => (
+                <li key={w.id} className="flex items-start justify-between py-3">
+                  <div>
+                    <div className="text-sm font-medium text-zinc-900">
+                      {w.amount_koins} Koins
                     </div>
-
-                    {r.coupon && (
-                      <div className="shrink-0">
-                        <div className="text-[11px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-md">
-                          {r.coupon}
-                        </div>
-                        <div className="text-[10px] text-emerald-600 mt-1 text-right">
-                          Cupom aprovado
-                        </div>
+                    <div className="text-xs text-zinc-500">
+                      {new Date(w.created_at).toLocaleString()}
+                      {w.note ? ` • ${w.note}` : ''}
+                    </div>
+                    {w.coupon && w.status === 'approved' && (
+                      <div className="mt-1">
+                        <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 font-mono text-xs text-zinc-800 ring-1 ring-inset ring-zinc-200">
+                          {w.coupon}
+                        </span>
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusClasses[w.status]}`}
+                    title={w.status}
+                  >
+                    {w.status === 'pending' && 'Pendente'}
+                    {w.status === 'approved' && 'Aprovado'}
+                    {w.status === 'denied' && 'Negado'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>
