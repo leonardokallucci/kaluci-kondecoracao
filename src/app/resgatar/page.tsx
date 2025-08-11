@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import * as SupabaseModule from '@/lib/supabaseClient';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 
-const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['400','600','700'] });
+const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['400', '600', '700'] });
 
 type WithdrawalStatus = 'pending' | 'approved' | 'denied';
 type Withdrawal = {
@@ -17,9 +17,9 @@ type Withdrawal = {
 };
 
 const chip: Record<WithdrawalStatus, string> = {
-  pending:  'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+  pending: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
   approved: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-  denied:   'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
+  denied: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
 };
 
 // ====== helpers de estilo (cards/inputs/botões quadrados arredondados) ======
@@ -60,11 +60,11 @@ export default function ResgatarPage() {
   const [email, setEmail] = useState('');
   const [userId, setUserId] = useState('');
   const [balance, setBalance] = useState(0);
-  const [history, setHistory] = useState<Withdrawal[]>([]);
+  const [history, setHistory] = useState < Withdrawal[] > ([]);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [error, setError] = useState < string | null > (null);
+  const [okMsg, setOkMsg] = useState < string | null > (null);
 
   async function loadAll() {
     setLoading(true);
@@ -117,7 +117,7 @@ export default function ResgatarPage() {
       await navigator.clipboard.writeText(c);
       setOkMsg('Cupom copiado!');
       setTimeout(() => setOkMsg(null), 1200);
-    } catch {}
+    } catch { }
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -126,7 +126,7 @@ export default function ResgatarPage() {
 
     const a = Number(amount);
     if (!a || a <= 0) return setError('Informe um valor válido de Koins.');
-    if (a > balance)   return setError('Valor solicitado é maior que seu saldo disponível.');
+    if (a > balance) return setError('Valor solicitado é maior que seu saldo disponível.');
 
     try {
       setSubmitting(true);
@@ -152,51 +152,53 @@ export default function ResgatarPage() {
     <div className={`${jakarta.className} bg-zinc-50`}>
       <div className="mx-auto max-w-6xl px-4 pb-16">
         {/* Cabeçalho da página */}
-        <div className="sticky top-0 z-10 -mx-4 mb-6 border-b border-zinc-200 bg-zinc-50/80 px-4 py-4 backdrop-blur">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Resgatar Koins</h1>
-          <p className="mt-1 text-sm text-zinc-500">Converta seus Koins em cupom. O pedido vai para aprovação.</p>
-        </div>
+        <div>
+          <div className="sticky top-0 z-10 -mx-4 mb-6 border-b border-zinc-200 bg-zinc-50/80 px-4 py-4 backdrop-blur">
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Resgatar Koins</h1>
+            <p className="mt-1 text-sm text-zinc-500">Converta seus Koins em cupom. O pedido vai para aprovação.</p>
+          </div>
 
-        {/* Alerts separados em bloco */}
-        {error && (
-          <div role="alert" className={`${CARD} ${CARD_PAD} mb-6 border-rose-200 bg-rose-50/60`}>
-            <p className="text-sm font-medium text-rose-700">{error}</p>
-          </div>
-        )}
-        {okMsg && (
-          <div role="status" className={`${CARD} ${CARD_PAD} mb-6 border-emerald-200 bg-emerald-50/70`}>
-            <p className="text-sm font-medium text-emerald-700">{okMsg}</p>
-          </div>
-        )}
+          {/* Alerts separados em bloco */}
+          {error && (
+            <div role="alert" className={`${CARD} ${CARD_PAD} mb-6 border-rose-200 bg-rose-50/60`}>
+              <p className="text-sm font-medium text-rose-700">{error}</p>
+            </div>
+          )}
+          {okMsg && (
+            <div role="status" className={`${CARD} ${CARD_PAD} mb-6 border-emerald-200 bg-emerald-50/70`}>
+              <p className="text-sm font-medium text-emerald-700">{okMsg}</p>
+            </div>
+          )}
 
-        {/* Bloco 1 — Resumo (card próprio) */}
-        {!loading && !userId ? (
-          <div className={`${CARD} ${CARD_PAD} mb-6`}>
-            <p className="text-zinc-700">
-              Você não está logado. Acesse{' '}
-              <a href="/login" className="font-medium text-indigo-600 hover:underline">/login</a> para continuar.
-            </p>
-          </div>
-        ) : (
-          <div className={`${CARD} ${CARD_PAD} mb-6`}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-zinc-500">Usuário</div>
-                <div className="mt-1 text-sm font-medium text-zinc-900">
-                  {loading ? <span className="inline-block h-4 w-40 animate-pulse rounded bg-zinc-200" /> : (email || '—')}
+          {/* Bloco 1 — Resumo (card próprio) */}
+          {!loading && !userId ? (
+            <div className={`${CARD} ${CARD_PAD} mb-6`}>
+              <p className="text-zinc-700">
+                Você não está logado. Acesse{' '}
+                <a href="/login" className="font-medium text-indigo-600 hover:underline">/login</a> para continuar.
+              </p>
+            </div>
+          ) : (
+            <div className={`${CARD} ${CARD_PAD} mb-6`}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-zinc-500">Usuário</div>
+                  <div className="mt-1 text-sm font-medium text-zinc-900">
+                    {loading ? <span className="inline-block h-4 w-40 animate-pulse rounded bg-zinc-200" /> : (email || '—')}
+                  </div>
                 </div>
-              </div>
-              <div className="text-left sm:text-right">
-                <div className="text-[11px] uppercase tracking-wide text-zinc-500">Saldo disponível</div>
-                <div className="mt-1">
-                  <span className="inline-flex items-center rounded-lg bg-indigo-50 px-2.5 py-1 text-sm font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                    {loading ? '—' : `${balance} Koins`}
-                  </span>
+                <div className="text-left sm:text-right">
+                  <div className="text-[11px] uppercase tracking-wide text-zinc-500">Saldo disponível</div>
+                  <div className="mt-1">
+                    <span className="inline-flex items-center rounded-lg bg-indigo-50 px-2.5 py-1 text-sm font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                      {loading ? '—' : `${balance} Koins`}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Blocos 2 e 3 — Formulário e Histórico (cards lado a lado) */}
         {userId && (
