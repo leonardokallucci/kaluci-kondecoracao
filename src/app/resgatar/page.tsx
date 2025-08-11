@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-// Import resiliente: funciona com export default OU nomeado
-import * as SupabaseModule from '@/lib/supabaseClient';
+import * as SupabaseModule from '@/lib/supabaseClient'; // qualquer tipo de export
 
 type WithdrawalStatus = 'pending' | 'approved' | 'denied';
 type Withdrawal = {
@@ -14,42 +13,62 @@ type Withdrawal = {
   created_at: string;
 };
 
-// Classe visual por status
 const statusChip: Record<WithdrawalStatus, string> = {
   pending:  'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
   approved: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
   denied:   'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
 };
 
+// -------- Adapter robusto para qualquer export do supabaseClient --------
+function resolveSupabaseClient(): any {
+  const m: any = SupabaseModule as any;
+
+  // 1) export const supabase = createClient(...)
+  if (m.supabase?.auth) return m.supabase;
+
+  // 2) export default {supabase}
+  if (m.default?.supabase?.auth) return m.default.supabase;
+
+  // 3) export function createClient() { return createClient(...) }
+  if (typeof m.createClient === 'function') {
+    const c = m.createClient();
+    if (c?.auth) return c;
+  }
+
+  // 4) export default function createClient() { ... }
+  if (typeof m.default === 'function') {
+    const c = m.default();
+    if (c?.auth) return c;
+  }
+
+  // 5) export default supabase (instância)
+  if (m.default?.auth) return m.default;
+
+  // 6) último recurso: o próprio módulo pode ser a instância
+  if (m?.auth) return m;
+
+  throw new Error('Não foi possível resolver o cliente Supabase. Verifique src/lib/supabaseClient.ts');
+}
+
 export default function ResgatarPage() {
-  // Cria cliente Supabase independentemente do tipo de export
-  const supabase = useMemo(() => {
-    const m: any = SupabaseModule as any;
-    if (typeof m.createClient === 'function') return m.createClient(); // export nomeado
-    if (typeof m.default === 'function') return m.default();            // export default (função)
-    return m.default ?? m;                                              // export instância (fallback)
-  }, []);
+  const supabase = useMemo(() => resolveSupabaseClient(), []);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-
-  const [email, setEmail] = useState<string>('');
-  const [userId, setUserId] = useState<string>('');
-
-  const [balance, setBalance] = useState<number>(0);
+  const [email, setEmail] = useState('');
+  const [userId, setUserId] = useState('');
+  const [balance, setBalance] = useState(0);
   const [history, setHistory] = useState<Withdrawal[]>([]);
-
-  const [amount, setAmount] = useState<string>('');
-  const [note, setNote] = useState<string>('');
-
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
 
-  // -------- helpers de carregamento --------
-  async function loadSessionAndData() {
+  async function loadAll() {
     setLoading(true);
     setError(null);
     try {
+      // se o client estivesse indefinido, o adapter já teria lançado erro
       const { data, error: sErr } = await supabase.auth.getSession();
       if (sErr) throw sErr;
 
@@ -74,15 +93,13 @@ export default function ResgatarPage() {
   }
 
   async function loadBalance(uid: string) {
-    // maybeSingle => evita “JSON object requested, multiple (or no) rows returned”
     const { data, error } = await supabase
       .from('v_user_balance')
       .select('koins_balance')
       .eq('user_id', uid)
-      .maybeSingle();
+      .maybeSingle(); // evita “JSON object requested…”
 
     if (error) {
-      // Se a view ainda não tem linha pro usuário, considere 0
       setBalance(0);
       return;
     }
@@ -96,28 +113,17 @@ export default function ResgatarPage() {
       .eq('user_id', uid)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      setHistory([]);
-      return;
-    }
-    setHistory(data ?? []);
+    setHistory(error ? [] : (data ?? []));
   }
 
-  // -------- submit --------
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setOkMsg(null);
 
     const a = Number(amount);
-    if (!a || a <= 0) {
-      setError('Informe um valor válido de Koins.');
-      return;
-    }
-    if (a > balance) {
-      setError('Valor solicitado é maior que seu saldo disponível.');
-      return;
-    }
+    if (!a || a <= 0) return setError('Informe um valor válido de Koins.');
+    if (a > balance)   return setError('Valor solicitado é maior que seu saldo disponível.');
 
     try {
       setSubmitting(true);
@@ -127,7 +133,7 @@ export default function ResgatarPage() {
       });
       if (error) throw error;
 
-      setOkMsg('Solicitação enviada com sucesso! Aguarde aprovação do administrador.');
+      setOkMsg('Solicitação enviada! Aguarde aprovação.');
       setAmount('');
       setNote('');
       await Promise.all([loadBalance(userId), loadHistory(userId)]);
@@ -139,14 +145,12 @@ export default function ResgatarPage() {
   }
 
   useEffect(() => {
-    loadSessionAndData();
+    loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // -------- UI --------
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
-      {/* Título */}
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Resgatar Koins</h1>
         <p className="mt-1 text-sm text-zinc-500">
@@ -154,7 +158,6 @@ export default function ResgatarPage() {
         </p>
       </div>
 
-      {/* Avisos */}
       {error && (
         <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">
           {error}
@@ -166,7 +169,6 @@ export default function ResgatarPage() {
         </div>
       )}
 
-      {/* Caso não logado */}
       {!loading && !userId && (
         <div className="rounded-xl border border-zinc-200 bg-white p-6 text-zinc-700 shadow-sm">
           Você não está logado. Acesse{' '}
@@ -177,27 +179,19 @@ export default function ResgatarPage() {
         </div>
       )}
 
-      {/* Cards principais */}
       {userId && (
         <div className="grid gap-6 md:grid-cols-2">
-          {/* Card: formulário */}
+          {/* Formulário */}
           <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <div className="text-xs uppercase tracking-wide text-zinc-500">Usuário</div>
                 <div className="mt-1 font-medium text-zinc-900">
-                  {loading ? (
-                    <span className="inline-block h-4 w-40 animate-pulse rounded bg-zinc-200" />
-                  ) : (
-                    email || '—'
-                  )}
+                  {loading ? <span className="inline-block h-4 w-40 animate-pulse rounded bg-zinc-200" /> : (email || '—')}
                 </div>
               </div>
-
               <div className="text-right">
-                <div className="text-xs uppercase tracking-wide text-zinc-500">
-                  Saldo disponível
-                </div>
+                <div className="text-xs uppercase tracking-wide text-zinc-500">Saldo disponível</div>
                 <div className="mt-1">
                   <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-sm font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-200">
                     {loading ? '—' : `${balance} Koins`}
@@ -214,7 +208,6 @@ export default function ResgatarPage() {
                 <input
                   type="number"
                   min={1}
-                  inputMode="numeric"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="Ex.: 150"
@@ -246,7 +239,7 @@ export default function ResgatarPage() {
             </form>
           </div>
 
-          {/* Card: histórico */}
+          {/* Histórico */}
           <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-zinc-900">Histórico</h2>
@@ -265,17 +258,14 @@ export default function ResgatarPage() {
               <p className="text-sm text-zinc-500">
                 Nenhuma solicitação ainda.
                 <br />
-                Pedidos aprovados exibem o <span className="font-medium">cupom</span>. Use-o no
-                site conforme combinado.
+                Pedidos aprovados exibem o <span className="font-medium">cupom</span>. Use-o no site conforme combinado.
               </p>
             ) : (
               <ul className="divide-y divide-zinc-200">
                 {history.map((w) => (
                   <li key={w.id} className="flex items-start justify-between py-3">
                     <div>
-                      <div className="text-sm font-medium text-zinc-900">
-                        {w.amount_koins} Koins
-                      </div>
+                      <div className="text-sm font-medium text-zinc-900">{w.amount_koins} Koins</div>
                       <div className="text-xs text-zinc-500">
                         {new Date(w.created_at).toLocaleString('pt-BR')}
                         {w.note ? ` • ${w.note}` : ''}
@@ -288,10 +278,7 @@ export default function ResgatarPage() {
                         </div>
                       )}
                     </div>
-
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusChip[w.status]}`}
-                    >
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusChip[w.status]}`}>
                       {w.status === 'pending' && 'Pendente'}
                       {w.status === 'approved' && 'Aprovado'}
                       {w.status === 'denied' && 'Negado'}
