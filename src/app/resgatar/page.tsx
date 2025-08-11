@@ -103,7 +103,7 @@ export default function ResgatarPage() {
 
   return (
     <div className="container mx-auto max-w-5xl px-4 py-6">
-      <h1 className="text-2xl font-semibold mb-4">Resgatar Koins</h1>
+      <h1 className="text-2xl font-semibold mb-4">Resgatar Koi</h1>
 
       {err && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700">
