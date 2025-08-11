@@ -22,81 +22,27 @@ const chip: Record<WithdrawalStatus, string> = {
   denied:   'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
 };
 
-// ---------- helpers de UI no estilo do exemplo ----------
+// ——— estilos no MESMO “mood” do print ———
 const SHELL = 'bg-zinc-50 min-h-screen';
-const WRAP  = 'mx-auto max-w-7xl px-6';
+const WRAP  = 'mx-auto max-w-7xl px-6 py-6';
 const CARD  = 'rounded-2xl border border-zinc-200 bg-white shadow-sm';
 const PAD   = 'p-6';
+const TITLE = 'text-[15px] font-semibold text-zinc-900';
+const HELP  = 'text-sm text-zinc-500';
 const INPUT = 'w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-zinc-900 outline-none transition focus:border-zinc-900 focus:ring-2 focus:ring-zinc-200';
 const BTN   = 'rounded-xl bg-zinc-900 text-white px-4 py-2.5 text-sm font-semibold hover:bg-black transition disabled:opacity-50 disabled:cursor-not-allowed';
-const SOFT  = 'rounded-lg px-2.5 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-100';
+const BTN_SOFT = 'rounded-lg px-2.5 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-100';
 
-// ====== adapter p/ qualquer export do supabaseClient ======
+// ——— adapter p/ qualquer export de supabaseClient ———
 function resolveSupabaseClient(): any {
   const m: any = SupabaseModule as any;
   if (m.supabase?.auth) return m.supabase;
   if (m.default?.supabase?.auth) return m.default.supabase;
-  if (typeof m.createClient === 'function') {
-    const c = m.createClient(); if (c?.auth) return c;
-  }
-  if (typeof m.default === 'function') {
-    const c = m.default(); if (c?.auth) return c;
-  }
+  if (typeof m.createClient === 'function') { const c = m.createClient(); if (c?.auth) return c; }
+  if (typeof m.default === 'function') { const c = m.default(); if (c?.auth) return c; }
   if (m.default?.auth) return m.default;
   if (m?.auth) return m;
   throw new Error('Não foi possível resolver o cliente Supabase. Verifique src/lib/supabaseClient.ts');
-}
-
-// ====== Header no mesmo estilo do print ======
-function SiteHeader() {
-  const nav = [
-    { href: '/dashboard', label: 'Dashboard', current: false },
-    { href: '/pontuar',   label: 'Pontuar',   current: false },
-    { href: '/resgatar',  label: 'Resgatar',  current: true  }, // <- página atual
-    { href: '/ranking',   label: 'Ranking',   current: false },
-    { href: '/aprovacoes',label: 'Aprovações',current: false },
-    { href: '/colabs',    label: 'Colaboradores', current: false },
-  ];
-  return (
-    <div className="sticky top-0 z-40 w-full border-b border-zinc-200 bg-white/90 backdrop-blur">
-      <div className={`${WRAP} flex h-14 items-center justify-between`}>
-        <div className="flex items-center gap-3">
-          {/* Logo simples no lugar do KALUCI do print */}
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-md bg-zinc-900" />
-            <span className="text-sm font-semibold text-zinc-900">Kaluci</span>
-          </div>
-          <span className="hidden text-sm text-zinc-500 sm:inline">Kondecoração</span>
-        </div>
-
-        <nav className="flex items-center gap-2">
-          {nav.map((n) => (
-            <a
-              key={n.label}
-              href={n.href}
-              className={[
-                'rounded-full border px-3.5 py-1.5 text-sm transition',
-                n.current
-                  ? 'border-zinc-900 bg-zinc-900 text-white'
-                  : 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50'
-              ].join(' ')}
-            >
-              {n.label}
-            </a>
-          ))}
-          <a
-            href="/login"
-            className="rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-sm text-zinc-800 hover:bg-zinc-50"
-          >
-            Entrar
-          </a>
-        </nav>
-      </div>
-      <div className={`${WRAP} pb-3 pt-2 text-xs text-zinc-500`}>
-        1 ponto = 5 Koins • 1 Koin = R$1 (Pix)
-      </div>
-    </div>
-  );
 }
 
 export default function ResgatarPage() {
@@ -112,6 +58,8 @@ export default function ResgatarPage() {
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+
+  useEffect(() => { loadAll(); /* eslint-disable-next-line */ }, []);
 
   async function loadAll() {
     setLoading(true); setError(null);
@@ -151,11 +99,7 @@ export default function ResgatarPage() {
   function useMax() { setAmount(String(balance || '')); }
 
   async function copyCoupon(c: string) {
-    try {
-      await navigator.clipboard.writeText(c);
-      setOkMsg('Cupom copiado!');
-      setTimeout(() => setOkMsg(null), 1200);
-    } catch {}
+    try { await navigator.clipboard.writeText(c); setOkMsg('Cupom copiado!'); setTimeout(() => setOkMsg(null), 1200); } catch {}
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -176,15 +120,13 @@ export default function ResgatarPage() {
     } finally { setSubmitting(false); }
   }
 
-  useEffect(() => { loadAll(); /* eslint-disable-next-line */ }, []);
-
   return (
     <div className={`${jakarta.className} ${SHELL}`}>
-      {/* Topbar no estilo do print */}
-      <SiteHeader />
+      <div className={WRAP}>
+        {/* título simples, sem infos extras */}
+        <h1 className="mb-4 text-2xl font-semibold tracking-tight text-zinc-900">Resgatar</h1>
 
-      <main className={`${WRAP} py-6`}>
-        {/* Alerts como cards (mesma linguagem visual) */}
+        {/* alerts no mesmo estilo dos cards */}
         {error && (
           <div className={`${CARD} ${PAD} mb-6 border-rose-200 bg-rose-50/70`}>
             <p className="text-sm font-medium text-rose-700">{error}</p>
@@ -196,12 +138,12 @@ export default function ResgatarPage() {
           </div>
         )}
 
-        {/* Cards no mesmo grid e estética do exemplo */}
+        {/* dois blocos arredondados lado a lado – só estilo */}
         <div className="grid gap-6 md:grid-cols-2">
-          {/* Card: Formulário */}
+          {/* Bloco 1: Formulário */}
           <section className={`${CARD} ${PAD}`}>
-            <h2 className="text-[15px] font-semibold text-zinc-900">Resgatar Koins</h2>
-            <p className="mt-1 text-sm text-zinc-500">Converta seus Koins em cupom após aprovação.</p>
+            <h2 className={TITLE}>Solicitar resgate</h2>
+            <p className="mt-1 ${HELP}">Seu pedido será analisado.</p>
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <div>
@@ -211,7 +153,7 @@ export default function ResgatarPage() {
                 </div>
               </div>
               <div className="text-left sm:text-right">
-                <div className="text-[11px] uppercase tracking-wide text-zinc-500">Saldo disponível</div>
+                <div className="text-[11px] uppercase tracking-wide text-zinc-500">Saldo</div>
                 <div className="mt-1 inline-flex items-center rounded-lg bg-zinc-100 px-2.5 py-1 text-sm font-semibold text-zinc-800 ring-1 ring-inset ring-zinc-200">
                   {loading ? '—' : `${balance} Koins`}
                 </div>
@@ -220,9 +162,7 @@ export default function ResgatarPage() {
 
             <form onSubmit={onSubmit} className="mt-6 space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-zinc-700">
-                  Quantidade a resgatar (Koins)
-                </label>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">Quantidade</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -233,7 +173,7 @@ export default function ResgatarPage() {
                     placeholder="Ex.: 150"
                     className={INPUT}
                   />
-                  <button type="button" onClick={useMax} className={`${SOFT} absolute inset-y-0 right-1 my-1`}>
+                  <button type="button" onClick={useMax} className={`${BTN_SOFT} absolute inset-y-0 right-1 my-1`}>
                     Usar máx.
                   </button>
                 </div>
@@ -241,12 +181,12 @@ export default function ResgatarPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-zinc-700">Observação (opcional)</label>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">Observação</label>
                 <textarea
                   rows={2}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Ex.: Preciso do cupom hoje"
+                  placeholder="(opcional)"
                   className={`${INPUT} resize-none`}
                 />
               </div>
@@ -257,9 +197,9 @@ export default function ResgatarPage() {
             </form>
           </section>
 
-          {/* Card: Histórico */}
+          {/* Bloco 2: Histórico */}
           <section className={`${CARD} ${PAD}`}>
-            <h2 className="text-[15px] font-semibold text-zinc-900">Histórico</h2>
+            <h2 className={TITLE}>Histórico</h2>
 
             <div className="mt-4">
               {loading ? (
@@ -273,7 +213,7 @@ export default function ResgatarPage() {
                 </div>
               ) : history.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-500">
-                  Nenhuma solicitação ainda. Aprovados exibem o <span className="font-medium">cupom</span>.
+                  Nenhuma solicitação ainda.
                 </div>
               ) : (
                 <ul className="divide-y divide-zinc-200">
@@ -290,7 +230,7 @@ export default function ResgatarPage() {
                             <span className="rounded-lg bg-zinc-100 px-1.5 py-0.5 font-mono text-xs text-zinc-800 ring-1 ring-inset ring-zinc-200">
                               {w.coupon}
                             </span>
-                            <button type="button" onClick={() => copyCoupon(w.coupon!)} className={SOFT}>
+                            <button type="button" onClick={() => copyCoupon(w.coupon!)} className={BTN_SOFT}>
                               copiar
                             </button>
                           </div>
@@ -308,7 +248,7 @@ export default function ResgatarPage() {
             </div>
           </section>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
